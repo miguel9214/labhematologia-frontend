@@ -6,13 +6,13 @@
       Resultados de Laboratorio
     </h1>
 
-    <!-- Solo búsqueda por nombre -->
+    <!-- Búsqueda por nombre -->
     <div class="row mb-4">
       <div class="col-12">
         <div class="input-group">
           <span class="input-group-text"><i class="bi bi-search"></i></span>
           <input
-            v-model="filters.search"
+            v-model="search"
             type="text"
             class="form-control"
             placeholder="Buscar por código o nombre del PDF..."
@@ -30,7 +30,8 @@
       <!-- Lista de PDFs -->
       <div class="col-lg-4 mb-4">
         <ul class="list-group overflow-auto" style="max-height:75vh">
-          <transition-group name="list-fade">
+          <transition-group name="list-fade" tag="div">
+            <!-- Cada PDF con key única -->
             <li
               v-for="pdf in pdfs.data"
               :key="pdf.path"
@@ -47,32 +48,51 @@
                 </small>
               </div>
             </li>
+
+            <!-- Mensaje de "no resultados" también con key -->
+            <li
+              v-if="!pdfs.data.length && !loading"
+              key="no-results"
+              class="list-group-item text-center text-muted"
+            >
+              <i class="bi bi-exclamation-circle me-1"></i>
+              No se encontraron PDFs
+            </li>
           </transition-group>
-          <li v-if="!pdfs.data.length && !loading" class="list-group-item text-center text-muted">
-            <i class="bi bi-exclamation-circle me-1"></i>No se encontraron PDFs
-          </li>
         </ul>
 
         <!-- Paginación -->
         <nav v-if="pdfs.meta.last_page > 1" class="mt-3">
-          <ul class="pagination justify-content-center">
-            <li class="page-item" :class="{ disabled: pdfs.meta.current_page === 1 }">
-              <a class="page-link" @click.prevent="fetchPdfs(pdfs.meta.current_page - 1)">
+          <ul class="pagination justify-content-center mb-0">
+            <li
+              class="page-item"
+              :class="{ disabled: pdfs.meta.current_page === 1 }"
+            >
+              <button
+                class="page-link"
+                @click.prevent="fetchPdfs(pdfs.meta.current_page - 1)"
+              >
                 <i class="bi bi-chevron-left"></i>
-              </a>
+              </button>
             </li>
             <li
-              v-for="p in Math.min(pdfs.meta.last_page, 5)"
+              v-for="p in pageRange"
               :key="p"
               class="page-item"
               :class="{ active: p === pdfs.meta.current_page }"
             >
-              <a class="page-link" @click.prevent="fetchPdfs(p)">{{ p }}</a>
+              <button class="page-link" @click.prevent="fetchPdfs(p)">{{ p }}</button>
             </li>
-            <li class="page-item" :class="{ disabled: pdfs.meta.current_page === pdfs.meta.last_page }">
-              <a class="page-link" @click.prevent="fetchPdfs(pdfs.meta.current_page + 1)">
+            <li
+              class="page-item"
+              :class="{ disabled: pdfs.meta.current_page === pdfs.meta.last_page }"
+            >
+              <button
+                class="page-link"
+                @click.prevent="fetchPdfs(pdfs.meta.current_page + 1)"
+              >
                 <i class="bi bi-chevron-right"></i>
-              </a>
+              </button>
             </li>
           </ul>
         </nav>
@@ -103,15 +123,42 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { usePdfs } from '@/composables/useApi.js'
+import { ref, computed, onMounted } from 'vue'
+import { usePdfs } from '@/composables/useApi'
 
-const { pdfs, filters, loading, fetchPdfs } = usePdfs()
+const { pdfs, search, loading, fetchPdfs } = usePdfs()
 const selectedPdf = ref(null)
 
 function selectPdf(pdf) {
   selectedPdf.value = pdf
 }
+
+// Paginación +/-2 páginas alrededor de la actual
+const pageRange = computed(() => {
+  const total   = pdfs.value.meta.last_page || 1
+  const current = pdfs.value.meta.current_page || 1
+  const delta   = 2
+  let start = Math.max(1, current - delta)
+  let end   = Math.min(total, current + delta)
+
+  if (current - delta < 1) {
+    end = Math.min(total, end + (delta - (current - 1)))
+  }
+  if (current + delta > total) {
+    start = Math.max(1, start - ((current + delta) - total))
+  }
+
+  const pages = []
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+})
+
+// Primera carga al montar
+onMounted(() => {
+  fetchPdfs()
+})
 </script>
 
 <style scoped>
